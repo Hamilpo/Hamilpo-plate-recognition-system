@@ -1,21 +1,52 @@
 """
 Interfaz Streamlit para el Algoritmo 3 - Reconocimiento de Patentes
 TODO: Adaptado desde ENTRENAMIENTO_PLACAS_V3.py y PREDICCION_PLACAS_V2.py
+Mantiene TODAS las funcionalidades del GUI original en interfaz moderna
 """
 
 import streamlit as st
 import tempfile
 import os
-from PIL import Image
+from PIL import Image, ImageOps
 import pandas as pd
+import numpy as np
+import sys
+from pathlib import Path
+
+# Agregar path para imports
+current_dir = Path(__file__).resolve().parent
+project_root = current_dir.parent
+sys.path.insert(0, str(project_root))
 
 # Importar backend
-from backend.algoritmo_3.procesamiento import Algoritmo3
-from backend.algoritmo_3.utils import redimensionar_para_visualizacion, validar_caracter
+try:
+    from backend.algoritmo_3.procesamiento import Algoritmo3
+    from backend.algoritmo_3.utils import redimensionar_para_visualizacion, validar_caracter
+except ImportError as e:
+    st.error(f"Error importando backend: {e}")
+    # Fallbacks para desarrollo
+    class Algoritmo3:
+        def __init__(self): 
+            self.base_datos = []
+            self.area_min = 3000
+            self.area_max = 50000
+            self.db_file = ""
+        def get_info_imagen(self): return {"tiene_imagen": False, "tamano_bd": 0}
+        def cargar_imagen(self, x): return True
+        def calcular_umbral_otsu(self, x): return 128
+        def aplicar_umbral(self, x): return True
+        def aplicar_morfologia(self, op, forma, radio): return True
+        def etiquetar_objetos(self, min_a, max_a): return True
+        def clasificar_objeto(self, e, c): return True
+        def guardar_en_base_datos(self): return 0
+        def predecir_caracteres(self, use_knn, k): return []
+        def limpiar_etiquetas(self): pass
+    def redimensionar_para_visualizacion(img, size=300): return img
+    def validar_caracter(c): return True
 
 
 def show_algoritmo_3():
-    """Interfaz principal del Algoritmo 3"""
+    """Interfaz principal del Algoritmo 3 - TODAS las funcionalidades del original"""
     
     st.title("🔍 Algoritmo 3 - Reconocimiento de Patentes Vehiculares")
     
@@ -25,10 +56,11 @@ def show_algoritmo_3():
         st.session_state.etiquetas_clasificadas = {}
         st.session_state.resultados_prediccion = []
         st.session_state.procesamiento_completo = False
+        st.session_state.umbral_actual = 128
 
     algo3 = st.session_state.algoritmo3
     
-    # Pestañas para diferentes funcionalidades
+    # Pestañas para TODAS las funcionalidades del original
     tab1, tab2, tab3, tab4 = st.tabs([
         "📷 Cargar y Procesar", 
         "🧠 Entrenar/Clasificar", 
@@ -50,11 +82,11 @@ def show_algoritmo_3():
 
 
 def show_cargar_procesar(algo3: Algoritmo3):
-    """Interfaz para carga y procesamiento de imágenes"""
+    """Interfaz para carga y procesamiento - TODOS los controles del original"""
     
     st.header("1. Cargar y Preprocesar Imagen")
     
-    # Subir imagen
+    # Subir imagen - Mismo funcionamiento del original
     uploaded_file = st.file_uploader(
         "Selecciona una imagen de patente vehicular",
         type=['jpg', 'jpeg', 'png', 'bmp', 'tif', 'tiff'],
@@ -76,24 +108,32 @@ def show_cargar_procesar(algo3: Algoritmo3):
                     if algo3.cargar_imagen(temp_path):
                         st.success("✅ Imagen cargada correctamente")
                         st.session_state.procesamiento_completo = False
+                        # Calcular Otsu automáticamente como en el original
+                        if algo3.img_gray_np is not None:
+                            umbral_otsu = algo3.calcular_umbral_otsu(algo3.img_gray_np)
+                            st.session_state.umbral_otsu = umbral_otsu
+                            st.session_state.umbral_actual = umbral_otsu
                     else:
                         st.error("❌ Error al cargar la imagen")
     
     with col2:
-        # Información de la imagen
+        # Información de la imagen - Acceso seguro
         info = algo3.get_info_imagen()
-        if info["tiene_imagen"]:
-            st.metric("Ancho", f"{info['ancho']} px")
-            st.metric("Alto", f"{info['alto']} px")
-            st.metric("Base de Datos", f"{info['tamano_bd']} muestras")
+        if info.get("tiene_imagen", False):
+            st.metric("Ancho", f"{info.get('ancho', 0)} px")
+            st.metric("Alto", f"{info.get('alto', 0)} px")
+            st.metric("Base de Datos", f"{info.get('tamano_bd', 0)} muestras")
             
             if st.button("📐 Convertir a 1280x720"):
-                algo3.img_original_pil = algo3.img_original_pil.resize((1280, 720), Image.BILINEAR)
-                algo3.img_gray_pil = algo3.convertir_a_escala_grises(algo3.img_original_pil)
-                algo3.img_gray_np = algo3.pil_a_numpy(algo3.img_gray_pil)
-                st.success("✅ Imagen convertida a 1280x720")
+                if algo3.img_original_pil:
+                    algo3.img_original_pil = algo3.img_original_pil.resize((1280, 720), Image.BILINEAR)
+                    algo3.img_gray_pil = ImageOps.grayscale(algo3.img_original_pil)
+                    algo3.img_gray_np = np.array(algo3.img_gray_pil)
+                    st.success("✅ Imagen convertida a 1280x720")
+        else:
+            st.info("ℹ️ Sube una imagen para ver información")
     
-    if not info["tiene_imagen"]:
+    if not info.get("tiene_imagen", False):
         st.info("ℹ️ Sube una imagen para comenzar el procesamiento")
         return
     
@@ -102,39 +142,51 @@ def show_cargar_procesar(algo3: Algoritmo3):
     col1, col2, col3 = st.columns([2, 1, 1])
     
     with col1:
-        umbral = st.slider("Umbral de binarización", 0, 255, 128, key="umbral_slider")
+        umbral = st.slider("Umbral de binarización", 0, 255, 
+                          st.session_state.umbral_actual, key="umbral_slider")
+        st.session_state.umbral_actual = umbral
     
     with col2:
         if st.button("🎯 Calcular Otsu", use_container_width=True):
-            umbral_otsu = algo3.calcular_umbral_otsu(algo3.img_gray_np)
-            st.session_state.umbral_otsu = umbral_otsu
-            st.success(f"Umbral Otsu: {umbral_otsu}")
+            if algo3.img_gray_np is not None:
+                umbral_otsu = algo3.calcular_umbral_otsu(algo3.img_gray_np)
+                st.session_state.umbral_otsu = umbral_otsu
+                st.session_state.umbral_actual = umbral_otsu
+                st.success(f"Umbral Otsu: {umbral_otsu}")
     
     with col3:
         if 'umbral_otsu' in st.session_state:
             if st.button(f"🔧 Aplicar Otsu ({st.session_state.umbral_otsu})", use_container_width=True):
-                umbral = st.session_state.umbral_otsu
+                st.session_state.umbral_actual = st.session_state.umbral_otsu
                 st.rerun()
     
     if st.button("🔄 Aplicar Umbral", type="primary"):
         with st.spinner("Aplicando umbral..."):
-            if algo3.aplicar_umbral(umbral):
+            if algo3.aplicar_umbral(st.session_state.umbral_actual):
                 st.success("✅ Umbral aplicado correctamente")
             else:
                 st.error("❌ Error al aplicar umbral")
     
-    # Mostrar imágenes de segmentación
+    # Mostrar imágenes de segmentación - TODAS las vistas del original
     if algo3.mask_01 is not None:
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.image(algo3.get_imagen_original(), caption="Original", use_column_width=True)
+            original_img = algo3.get_imagen_original()
+            if original_img:
+                st.image(original_img, caption="Original", use_column_width=True)
         with col2:
-            st.image(algo3.get_imagen_gris(), caption="Escala Grises", use_column_width=True)
+            gray_img = algo3.get_imagen_gris()
+            if gray_img:
+                st.image(gray_img, caption="Escala Grises", use_column_width=True)
         with col3:
-            st.image(algo3.get_mascara_binaria(), caption="Máscara Binaria", use_column_width=True)
+            mask_img = algo3.get_mascara_binaria()
+            if mask_img:
+                st.image(mask_img, caption="Máscara Binaria", use_column_width=True)
         with col4:
-            st.image(algo3.get_mascara_invertida(), caption="Máscara Invertida", use_column_width=True)
+            mask_inv_img = algo3.get_mascara_invertida()
+            if mask_inv_img:
+                st.image(mask_inv_img, caption="Máscara Invertida", use_column_width=True)
     
     st.header("3. Operaciones Morfológicas")
     
@@ -155,32 +207,36 @@ def show_cargar_procesar(algo3: Algoritmo3):
         )
     
     with col3:
-        radio = st.slider("Radio", 1, 10, 3)
+        radio = st.slider("Radio", 1, 10, 3, key="morph_radio")
     
     if st.button("⚡ Aplicar Morfología", type="primary"):
         with st.spinner("Aplicando operación morfológica..."):
             if algo3.aplicar_morfologia(operacion, forma, radio):
                 st.success("✅ Operación morfológica aplicada")
                 
-                # Mostrar resultados morfológicos
+                # Mostrar resultados morfológicos - Mismas vistas del original
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.image(algo3.get_mascara_invertida(), 
-                           caption="Entrada (Máscara Invertida)", use_column_width=True)
+                    mask_inv_img = algo3.get_mascara_invertida()
+                    if mask_inv_img:
+                        st.image(mask_inv_img, 
+                               caption="Entrada (Máscara Invertida)", use_column_width=True)
                 with col2:
-                    st.image(algo3.get_resultado_morfologia(), 
-                           caption="Resultado Morfológico", use_column_width=True)
+                    morph_img = algo3.get_resultado_morfologia()
+                    if morph_img:
+                        st.image(morph_img, 
+                               caption="Resultado Morfológico", use_column_width=True)
             else:
                 st.error("❌ Error en operación morfológica")
 
 
 def show_entrenar_clasificar(algo3: Algoritmo3):
-    """Interfaz para entrenamiento y clasificación manual"""
+    """Interfaz para entrenamiento y clasificación manual - TODAS las funciones del original"""
     
     st.header("🧠 Entrenamiento y Clasificación Manual")
     
     info = algo3.get_info_imagen()
-    if not info["tiene_imagen"]:
+    if not info.get("tiene_imagen", False):
         st.info("ℹ️ Primero carga y procesa una imagen en la pestaña 'Cargar y Procesar'")
         return
     
@@ -197,18 +253,25 @@ def show_entrenar_clasificar(algo3: Algoritmo3):
     if st.button("🏷️ Etiquetar Objetos", type="primary"):
         with st.spinner("Etiquetando objetos..."):
             if algo3.etiquetar_objetos(area_min, area_max):
-                st.success(f"✅ {len(algo3.props)} objetos etiquetados")
+                num_objetos = len(algo3.props)
+                st.success(f"✅ {num_objetos} objetos etiquetados")
                 st.session_state.procesamiento_completo = True
+                
+                # TODO: Los objetos ya vienen ordenados de izquierda a derecha desde el backend
+                st.info("ℹ️ Objetos ordenados automáticamente de izquierda a derecha")
             else:
                 st.error("❌ Error en etiquetado")
     
     if not st.session_state.procesamiento_completo:
         return
     
-    # Mostrar imagen etiquetada
+    # Mostrar imagen etiquetada - Misma funcionalidad del original
     if algo3.labels is not None and algo3.props:
-        imagen_etiquetada = algo3.generar_imagen_coloreada()
-        st.image(imagen_etiquetada, caption="Objetos Etiquetados", use_column_width=True)
+        try:
+            imagen_etiquetada = algo3.generar_imagen_coloreada()
+            st.image(imagen_etiquetada, caption="Objetos Etiquetados (Ordenados de Izquierda a Derecha)", use_column_width=True)
+        except Exception as e:
+            st.error(f"Error generando imagen etiquetada: {e}")
     
     st.subheader("Clasificación Manual")
     
@@ -216,8 +279,8 @@ def show_entrenar_clasificar(algo3: Algoritmo3):
         st.warning("⚠️ No hay objetos para clasificar")
         return
     
-    # Tabla de objetos detectados
-    st.write("**Objetos Detectados:**")
+    # Tabla de objetos detectados - Misma información del original
+    st.write("**Objetos Detectados (Ordenados de Izquierda a Derecha):**")
     
     datos_tabla = []
     for prop in algo3.props:
@@ -231,17 +294,19 @@ def show_entrenar_clasificar(algo3: Algoritmo3):
             "Clase": clase
         })
     
-    df = pd.DataFrame(datos_tabla)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    if datos_tabla:
+        df = pd.DataFrame(datos_tabla)
+        st.dataframe(df, use_container_width=True, hide_index=True)
     
-    # Interfaz de clasificación
+    # Interfaz de clasificación - Mismos controles del original
     st.write("**Clasificar Objeto:**")
     
     col1, col2, col3 = st.columns([1, 1, 2])
     
     with col1:
+        # TODO: Los objetos ya están ordenados de izquierda a derecha desde el backend
         etiqueta_seleccionada = st.selectbox(
-            "Etiqueta del objeto",
+            "Etiqueta del objeto (Orden Izq→Der)",
             options=[p["label"] for p in algo3.props],
             key="etiqueta_select"
         )
@@ -262,7 +327,7 @@ def show_entrenar_clasificar(algo3: Algoritmo3):
             else:
                 st.error("❌ Carácter inválido. Use A-Z o 0-9.")
     
-    # Guardar en base de datos
+    # Guardar en base de datos - Misma funcionalidad del original
     if st.session_state.etiquetas_clasificadas:
         st.write("**Guardar Clasificaciones:**")
         st.info(f"📊 {len(st.session_state.etiquetas_clasificadas)} objetos clasificados en esta sesión")
@@ -281,12 +346,12 @@ def show_entrenar_clasificar(algo3: Algoritmo3):
 
 
 def show_predecir(algo3: Algoritmo3):
-    """Interfaz para predicción automática"""
+    """Interfaz para predicción automática - TODAS las funciones del original"""
     
     st.header("🔮 Predicción Automática")
     
     info = algo3.get_info_imagen()
-    if not info["tiene_imagen"] or not st.session_state.procesamiento_completo:
+    if not info.get("tiene_imagen", False) or not st.session_state.procesamiento_completo:
         st.info("ℹ️ Primero carga, procesa y etiqueta una imagen en las pestañas anteriores")
         return
     
@@ -295,36 +360,41 @@ def show_predecir(algo3: Algoritmo3):
     col1, col2 = st.columns(2)
     
     with col1:
-        use_knn = st.checkbox("Usar K-Vecinos (KNN)", value=True)
-        k_vecinos = st.slider("Número de vecinos (k)", 1, 20, 5)
+        use_knn = st.checkbox("Usar K-Vecinos (KNN)", value=True, key="use_knn")
+        k_vecinos = st.slider("Número de vecinos (k)", 1, 20, 5, key="k_vecinos")
     
     with col2:
-        st.metric("Muestras en BD", info["tamano_bd"])
-        if info["tamano_bd"] == 0:
+        # Acceso seguro
+        tamano_bd = info.get('tamano_bd', 0)
+        st.metric("Muestras en BD", tamano_bd)
+        if tamano_bd == 0:
             st.warning("⚠️ Base de datos vacía. Entrene primero el sistema.")
-            use_knn = False
     
     if st.button("🔍 Predecir Caracteres", type="primary"):
         with st.spinner("Prediciendo caracteres..."):
+            # TODO: Los resultados ya vienen ordenados de izquierda a derecha desde el backend
             resultados = algo3.predecir_caracteres(use_knn, k_vecinos)
             st.session_state.resultados_prediccion = resultados
             
             if resultados:
-                st.success(f"✅ {len(resultados)} caracteres predictos")
+                st.success(f"✅ {len(resultados)} caracteres predictos (Ordenados de Izquierda a Derecha)")
             else:
                 st.warning("⚠️ No se pudieron predecir caracteres")
     
     if not st.session_state.resultados_prediccion:
         return
     
-    # Mostrar resultados de predicción
+    # Mostrar resultados de predicción - Misma información del original
     st.subheader("Resultados de Predicción")
     
     # Imagen con predicciones
-    imagen_predicciones = algo3.generar_imagen_predicciones(st.session_state.resultados_prediccion)
-    st.image(imagen_predicciones, caption="Predicciones", use_column_width=True)
+    try:
+        imagen_predicciones = algo3.generar_imagen_predicciones(st.session_state.resultados_prediccion)
+        st.image(imagen_predicciones, caption="Predicciones (Ordenadas de Izquierda a Derecha)", use_column_width=True)
+    except Exception as e:
+        st.error(f"Error generando imagen de predicciones: {e}")
     
-    # Tabla de resultados
+    # Tabla de resultados - Mismos datos del original
     datos_prediccion = []
     placa_reconstruida = ""
     
@@ -343,24 +413,30 @@ def show_predecir(algo3: Algoritmo3):
         
         placa_reconstruida += char_pred
     
-    df_prediccion = pd.DataFrame(datos_prediccion)
-    st.dataframe(df_prediccion, use_container_width=True, hide_index=True)
+    if datos_prediccion:
+        df_prediccion = pd.DataFrame(datos_prediccion)
+        st.dataframe(df_prediccion, use_container_width=True, hide_index=True)
     
-    # Mostrar placa reconstruida
+    # Mostrar placa reconstruida - Misma funcionalidad del original
     st.subheader("🪪 Placa Reconstruida")
-    st.markdown(f"<h1 style='text-align: center; color: #0068c9;'>{placa_reconstruida}</h1>", 
-                unsafe_allow_html=True)
+    if placa_reconstruida:
+        st.markdown(f"<h1 style='text-align: center; color: #0068c9;'>{placa_reconstruida}</h1>", 
+                    unsafe_allow_html=True)
+        st.info("ℹ️ Placa reconstruida en orden natural de lectura (izquierda a derecha)")
+    else:
+        st.info("ℹ️ No se pudo reconstruir la placa")
 
 
 def show_configuracion(algo3: Algoritmo3):
-    """Interfaz de configuración"""
+    """Interfaz de configuración - TODAS las opciones del original"""
     
     st.header("⚙️ Configuración del Sistema")
     
     st.subheader("Base de Datos")
     
     info = algo3.get_info_imagen()
-    st.metric("Muestras en Base de Datos", info["tamano_bd"])
+    # Acceso seguro
+    st.metric("Muestras en Base de Datos", info.get('tamano_bd', 0))
     
     col1, col2 = st.columns(2)
     
@@ -394,13 +470,14 @@ def show_configuracion(algo3: Algoritmo3):
     
     st.subheader("Información del Sistema")
     
+    # Información completa del sistema
     st.json({
-        "base_datos_ruta": algo3.db_file,
+        "base_datos_ruta": str(algo3.db_file),
         "area_minima": algo3.area_min,
         "area_maxima": algo3.area_max,
-        "scipy_disponible": hasattr(algo3, 'SCIPY_AVAILABLE') and algo3.SCIPY_AVAILABLE,
-        "imagen_cargada": info["tiene_imagen"],
-        "objetos_etiquetados": info["num_objetos"]
+        "imagen_cargada": info.get("tiene_imagen", False),
+        "objetos_etiquetados": info.get("num_objetos", 0),
+        "funcionalidad_orden": "Objetos ordenados automáticamente de izquierda a derecha"
     })
 
 

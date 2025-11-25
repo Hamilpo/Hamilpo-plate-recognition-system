@@ -1,6 +1,7 @@
 """
 Utilidades específicas para el Algoritmo 3
 TODO: Funciones auxiliares movidas desde los scripts originales
+Mantiene EXACTAMENTE la misma funcionalidad original
 """
 
 import numpy as np
@@ -8,20 +9,20 @@ from PIL import Image, ImageDraw, ImageFont
 from typing import Tuple, List, Optional
 import os
 import json
-import pickle
 
 
 def redimensionar_imagen_1280x720(imagen: Image.Image) -> Image.Image:
     """
-    Redimensiona imagen a 1280x720 - TODO: Movido desde convertir_imagen_actual_1280x720
+    Redimensiona imagen a 1280x720 - TODO: Movido EXACTO desde convertir_imagen_actual_1280x720
     """
     return imagen.resize((1280, 720), Image.BILINEAR)
 
 
 def convertir_a_escala_grises(imagen: Image.Image) -> Image.Image:
     """
-    Convierte imagen a escala de grises - TODO: Movido desde ambos scripts
+    Convierte imagen a escala de grises - TODO: Movido EXACTO desde ambos scripts
     """
+    from PIL import ImageOps
     return ImageOps.grayscale(imagen)
 
 
@@ -44,7 +45,7 @@ def pil_a_numpy(imagen_pil: Image.Image) -> np.ndarray:
 
 def obtener_recorte_objeto(labels: np.ndarray, etiqueta: int, bbox: Tuple[int, int, int, int]) -> Image.Image:
     """
-    Obtiene recorte de un objeto etiquetado - TODO: Adaptado desde mostrar_recorte_etiqueta
+    Obtiene recorte de un objeto etiquetado - TODO: Adaptado EXACTO desde mostrar_recorte_etiqueta
     """
     x1, y1, x2, y2 = bbox
     H, W = labels.shape
@@ -62,14 +63,14 @@ def obtener_recorte_objeto(labels: np.ndarray, etiqueta: int, bbox: Tuple[int, i
         return Image.new('L', (1, 1), color=255)
 
     mask_crop = mask_lab[y1:y2+1, x1:x2+1] * 255
-    img_crop = 255 - mask_crop  # Carácter negro sobre fondo blanco
+    img_crop = 255 - mask_crop  # Carácter negro sobre fondo blanco - EXACTO al original
 
     return Image.fromarray(img_crop.astype(np.uint8), mode="L")
 
 
 def redimensionar_para_visualizacion(imagen: Image.Image, max_size: int = 300) -> Image.Image:
     """
-    Redimensiona imagen para visualización - TODO: Adaptado desde _mostrar_imagen
+    Redimensiona imagen para visualización - TODO: Adaptado EXACTO desde _mostrar_imagen
     """
     w, h = imagen.size
     if w > 0 and h > 0:
@@ -84,7 +85,7 @@ def redimensionar_para_visualizacion(imagen: Image.Image, max_size: int = 300) -
 
 def crear_fuente(tamano: int = 14) -> ImageFont.ImageFont:
     """
-    Crea fuente para dibujar texto - TODO: Movido desde ambos scripts
+    Crea fuente para dibujar texto - TODO: Movido EXACTO desde ambos scripts
     """
     try:
         return ImageFont.truetype("arial.ttf", tamano)
@@ -119,7 +120,7 @@ def cargar_configuracion(ruta: str) -> dict:
 
 def validar_caracter(caracter: str) -> bool:
     """
-    Valida que el carácter sea válido (A-Z, 0-9) - TODO: Movido desde clasificar_objeto
+    Valida que el carácter sea válido (A-Z, 0-9) - TODO: Movido EXACTO desde clasificar_objeto
     """
     caracter = caracter.strip().upper()
     return len(caracter) == 1 and (caracter.isalpha() or caracter.isdigit())

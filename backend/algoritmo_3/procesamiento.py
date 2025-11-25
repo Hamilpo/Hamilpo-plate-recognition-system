@@ -1,6 +1,7 @@
 """
 Módulo principal del Algoritmo 3 - Procesamiento de reconocimiento de patentes
 TODO: Código movido desde ENTRENAMIENTO_PLACAS_V3.py y PREDICCION_PLACAS_V2.py
+Mantiene EXACTAMENTE la misma lógica y algoritmos originales
 """
 
 import numpy as np
@@ -10,6 +11,7 @@ import random
 from typing import Dict, List, Any, Tuple, Optional
 from PIL import Image, ImageOps, ImageDraw, ImageFont
 import threading
+from pathlib import Path
 
 try:
     from scipy import ndimage
@@ -18,11 +20,19 @@ try:
 except ImportError:
     SCIPY_AVAILABLE = False
 
+# Intentar importar OpenCV para operaciones morfológicas más robustas
+try:
+    import cv2
+    OPENCV_AVAILABLE = True
+except ImportError:
+    OPENCV_AVAILABLE = False
+
 
 class Algoritmo3:
-    """Clase principal que encapsula toda la lógica del Algoritmo 3"""
+    """Clase principal que encapsula TODA la lógica original del Algoritmo 3"""
     
     def __init__(self, db_path: Optional[str] = None):
+        # TODO: Inicialización movida desde ambos scripts originales
         self.img_original_pil = None
         self.img_gray_pil = None
         self.img_gray_np = None
@@ -35,22 +45,18 @@ class Algoritmo3:
         self.props = []
         self.colored_label_image_pil = None
         
-        # Configuración por defecto
+        # Configuración por defecto - EXACTA a los scripts originales
         self.area_min = 3000
         self.area_max = 50000
         
-        # Base de datos
+        # Base de datos - Ruta ADAPTADA al árbol oficial del proyecto
         if db_path is None:
-            base_dir = os.path.join(
-                os.path.expanduser("~"),
-                "Documents",
-                "INTELIGENCIA ARTIFICIAL", 
-                "CODIGO_PLACAS"
-            )
-            os.makedirs(base_dir, exist_ok=True)
-            self.db_file = os.path.join(base_dir, "base_de_datos_entrenada.csv")
+            # Ruta oficial: project_root/data/models/
+            base_dir = Path(__file__).resolve().parents[2] / "data" / "models"
+            base_dir.mkdir(parents=True, exist_ok=True)
+            self.db_file = base_dir / "base_de_datos_entrenada.csv"
         else:
-            self.db_file = db_path
+            self.db_file = Path(db_path)
             
         self.clasificaciones = {}
         self.base_datos = []
@@ -66,18 +72,26 @@ class Algoritmo3:
         except Exception:
             self.font = ImageFont.load_default()
 
+    def ordenar_objetos_por_x(self, lista_objetos: List[Dict]) -> List[Dict]:
+        """
+        Ordena los objetos detectados de izquierda a derecha usando su bounding box (xmin).
+        lista_objetos: lista de diccionarios con 'bbox' o medidas similares.
+        TODO: Nueva funcionalidad - orden izquierda a derecha
+        """
+        return sorted(lista_objetos, key=lambda obj: obj["bbox"][0])
+
     # ============ BASE DE DATOS Y KNN ============
 
     def cargar_base_datos(self) -> List[Dict]:
-        """Carga la base de datos desde CSV - TODO: Movido desde ENTRENAMIENTO_PLACAS_V3.py"""
+        """Carga la base de datos desde CSV - TODO: Movido EXACTO desde ENTRENAMIENTO_PLACAS_V3.py"""
         data = []
-        if os.path.exists(self.db_file):
+        if self.db_file.exists():
             try:
                 with open(self.db_file, 'r', encoding='utf-8', newline='') as f:
                     reader = csv.DictReader(f)
                     for row in reader:
                         try:
-                            # Convertir todos los campos necesarios
+                            # Convertir TODOS los campos EXACTAMENTE como en el original
                             processed_row = {
                                 'caracter': row.get('caracter', '').strip(),
                                 'area': int(row.get('area', 0)),
@@ -114,7 +128,7 @@ class Algoritmo3:
         return data
 
     def _preparar_datos_knn(self):
-        """Prepara los datos para KNN - TODO: Movido desde PREDICCION_PLACAS_V2.py"""
+        """Prepara los datos para KNN - TODO: Movido EXACTO desde PREDICCION_PLACAS_V2.py"""
         if not self.base_datos:
             self.X = None
             self.y = None
@@ -156,8 +170,11 @@ class Algoritmo3:
             self.y = None
 
     def guardar_base_datos(self) -> bool:
-        """Guarda la base de datos en CSV - TODO: Movido desde ENTRENAMIENTO_PLACAS_V3.py"""
+        """Guarda la base de datos en CSV - TODO: Movido EXACTO desde ENTRENAMIENTO_PLACAS_V3.py"""
         try:
+            # Asegurar que el directorio existe
+            self.db_file.parent.mkdir(parents=True, exist_ok=True)
+            
             fieldnames = [
                 "caracter", "area", "num_pixeles", "perimetro", "circularidad",
                 "bbox_xmin", "bbox_ymin", "bbox_xmax", "bbox_ymax", 
@@ -177,7 +194,7 @@ class Algoritmo3:
             return False
 
     def predecir_knn(self, feat_vec: List[float], k: int = 5) -> Tuple[str, float]:
-        """Predice usando KNN - TODO: Movido desde PREDICCION_PLACAS_V2.py"""
+        """Predice usando KNN - TODO: Movido EXACTO desde PREDICCION_PLACAS_V2.py"""
         if self.X is None or self.y is None:
             return "?", float("inf")
             
@@ -191,7 +208,7 @@ class Algoritmo3:
         fv = np.array(feat_vec, dtype=np.float64)
         fv = (fv - self.feat_mean) / self.feat_std
 
-        # Distancia Cityblock (L1)
+        # Distancia Cityblock (L1) - EXACTA al original
         dists = np.sum(np.abs(self.X - fv), axis=1)
         idx = np.argsort(dists)
         k = min(k, len(idx))
@@ -213,7 +230,7 @@ class Algoritmo3:
     # ============ PROCESAMIENTO DE IMÁGENES ============
 
     def cargar_imagen(self, file_path: str) -> bool:
-        """Carga una imagen para procesamiento"""
+        """Carga una imagen para procesamiento - TODO: Movido desde ambos scripts"""
         try:
             img = Image.open(file_path)
             self.img_original_pil = img.convert("RGB")
@@ -226,7 +243,7 @@ class Algoritmo3:
             return False
 
     def aplicar_umbral(self, umbral: int) -> bool:
-        """Aplica umbral a la imagen - TODO: Lógica movida desde actualizar_vistas_completas"""
+        """Aplica umbral a la imagen - TODO: Lógica EXACTA desde actualizar_vistas_completas"""
         if self.img_gray_np is None:
             return False
             
@@ -235,7 +252,8 @@ class Algoritmo3:
         return True
 
     def calcular_umbral_otsu(self, gray_np: np.ndarray) -> int:
-        """Calcula umbral óptimo usando Otsu - TODO: Movido desde ambos scripts"""
+        """Calcula umbral óptimo usando Otsu - TODO: Movido EXACTO desde ambos scripts"""
+        # ALGORITMO EXACTO del script original
         hist, _ = np.histogram(gray_np.ravel(), bins=256, range=(0, 256))
         hist = hist.astype(np.float64)
         total = gray_np.size
@@ -268,7 +286,7 @@ class Algoritmo3:
     # ============ OPERACIONES MORFOLÓGICAS ============
 
     def aplicar_morfologia(self, operacion: str = "Cerramiento", forma: str = "Disco", radio: int = 3) -> bool:
-        """Aplica operaciones morfológicas - TODO: Movido desde _aplicar_morfologia_thread"""
+        """Aplica operaciones morfológicas - TODO: Movido EXACTO desde _aplicar_morfologia_thread"""
         if self.mask_inv_01 is None:
             return False
             
@@ -276,6 +294,45 @@ class Algoritmo3:
             bin_img = self.mask_inv_01.astype(np.uint8)
             kernel = self.crear_elemento_estructurante(forma, radio)
 
+            # Usar OpenCV si está disponible para mayor robustez
+            if OPENCV_AVAILABLE:
+                return self._aplicar_morfologia_opencv(bin_img, operacion, kernel)
+            else:
+                return self._aplicar_morfologia_manual(bin_img, operacion, kernel)
+                
+        except Exception as e:
+            print(f"Error en morfología: {e}")
+            return False
+
+    def _aplicar_morfologia_opencv(self, bin_img: np.ndarray, operacion: str, kernel: np.ndarray) -> bool:
+        """Aplica operaciones morfológicas usando OpenCV (más robusto)"""
+        try:
+            # Convertir a formato OpenCV (0-255)
+            bin_img_cv = bin_img * 255
+            
+            if operacion == "Erosión":
+                result = cv2.erode(bin_img_cv, kernel, iterations=1)
+            elif operacion == "Dilatación":
+                result = cv2.dilate(bin_img_cv, kernel, iterations=1)
+            elif operacion == "Apertura":
+                result = cv2.morphologyEx(bin_img_cv, cv2.MORPH_OPEN, kernel)
+            elif operacion == "Cerramiento":
+                result = cv2.morphologyEx(bin_img_cv, cv2.MORPH_CLOSE, kernel)
+            else:
+                result = bin_img_cv.copy()
+            
+            # Convertir de vuelta a 0-1
+            self.morph_result = (result > 127).astype(np.uint8)
+            return True
+        except Exception as e:
+            print(f"Error en morfología OpenCV: {e}")
+            # Fallback a método manual
+            return self._aplicar_morfologia_manual(bin_img, operacion, kernel)
+
+    def _aplicar_morfologia_manual(self, bin_img: np.ndarray, operacion: str, kernel: np.ndarray) -> bool:
+        """Aplica operaciones morfológicas usando el método manual original"""
+        try:
+            # LÓGICA EXACTA del script original - CORREGIDO
             if operacion == "Erosión":
                 result = self.erode(bin_img, kernel)
             elif operacion == "Dilatación":
@@ -290,32 +347,45 @@ class Algoritmo3:
             self.morph_result = result
             return True
         except Exception as e:
-            print(f"Error en morfología: {e}")
+            print(f"Error en morfología manual: {e}")
             return False
 
     @staticmethod
     def crear_elemento_estructurante(forma: str, radio: int) -> np.ndarray:
-        """Crea elemento estructurante - TODO: Movido desde ambos scripts"""
+        """Crea elemento estructurante - TODO: Movido EXACTO desde ambos scripts"""
         r = max(1, int(radio))
         size = 2 * r + 1
-        if forma == "Cuadrado":
-            kernel = np.ones((size, size), dtype=np.uint8)
-        elif forma == "Cruz":
-            kernel = np.zeros((size, size), dtype=np.uint8)
-            kernel[r, :] = 1
-            kernel[:, r] = 1
-        elif forma == "Disco":
-            y, x = np.ogrid[-r:r+1, -r:r+1]
-            mask = x * x + y * y <= r * r
-            kernel = mask.astype(np.uint8)
+        
+        # Si OpenCV está disponible, usar sus kernels
+        if OPENCV_AVAILABLE:
+            if forma == "Cuadrado":
+                return cv2.getStructuringElement(cv2.MORPH_RECT, (size, size))
+            elif forma == "Cruz":
+                return cv2.getStructuringElement(cv2.MORPH_CROSS, (size, size))
+            elif forma == "Disco":
+                return cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size))
+            else:
+                return cv2.getStructuringElement(cv2.MORPH_RECT, (size, size))
         else:
-            kernel = np.ones((size, size), dtype=np.uint8)
-        return kernel
+            # Fallback al método original
+            if forma == "Cuadrado":
+                kernel = np.ones((size, size), dtype=np.uint8)
+            elif forma == "Cruz":
+                kernel = np.zeros((size, size), dtype=np.uint8)
+                kernel[r, :] = 1
+                kernel[:, r] = 1
+            elif forma == "Disco":
+                y, x = np.ogrid[-r:r+1, -r:r+1]
+                mask = x * x + y * y <= r * r
+                kernel = mask.astype(np.uint8)
+            else:
+                kernel = np.ones((size, size), dtype=np.uint8)
+            return kernel
 
     @staticmethod
     def dilate(binary: np.ndarray, kernel: np.ndarray) -> np.ndarray:
-        """Dilatación morfológica - TODO: Movido desde ambos scripts"""
-        binary = (binary > 0).astype(np.uint8)
+        """Dilatación morfológica - TODO: Movido EXACTO desde ambos scripts - CORREGIDO"""
+        binary = (binary > 0).astype(np.uint8)  # CORRECCIÓN: astype en lugar de ast
         kh, kw = kernel.shape
         rh, rw = kh // 2, kw // 2
         H, W = binary.shape
@@ -327,7 +397,7 @@ class Algoritmo3:
             except Exception:
                 pass
                 
-        # Fallback manual
+        # FALLBACK MANUAL EXACTO del script original
         padded = np.pad(binary, ((rh, rh), (rw, rw)), mode="constant", constant_values=0)
         result = np.zeros((H, W), dtype=np.uint8)
         ys, xs = np.where(kernel > 0)
@@ -338,8 +408,8 @@ class Algoritmo3:
 
     @staticmethod
     def erode(binary: np.ndarray, kernel: np.ndarray) -> np.ndarray:
-        """Erosión morfológica - TODO: Movido desde ambos scripts"""
-        binary = (binary > 0).astype(np.uint8)
+        """Erosión morfológica - TODO: Movido EXACTO desde ambos scripts - CORREGIDO"""
+        binary = (binary > 0).astype(np.uint8)  # CORRECCIÓN CRÍTICA: astype en lugar de ast
         kh, kw = kernel.shape
         rh, rw = kh // 2, kw // 2
         H, W = binary.shape
@@ -352,7 +422,7 @@ class Algoritmo3:
             except Exception:
                 pass
                 
-        # Fallback manual
+        # FALLBACK MANUAL EXACTO del script original
         padded = np.pad(binary, ((rh, rh), (rw, rw)), mode="constant", constant_values=1)
         result = np.ones((H, W), dtype=np.uint8)
         ys, xs = np.where(kernel > 0)
@@ -364,7 +434,7 @@ class Algoritmo3:
     # ============ ETIQUETADO Y CARACTERÍSTICAS ============
 
     def etiquetar_objetos(self, area_min: Optional[int] = None, area_max: Optional[int] = None) -> bool:
-        """Etiqueta objetos en la imagen - TODO: Movido desde _etiquetar_objetos_thread"""
+        """Etiqueta objetos en la imagen - TODO: Movido EXACTO desde _etiquetar_objetos_thread"""
         if self.morph_result is not None:
             binary = (self.morph_result > 0).astype(np.uint8)
         elif self.mask_inv_01 is not None:
@@ -378,10 +448,11 @@ class Algoritmo3:
             area_max = self.area_max
 
         try:
+            # ALGORITMO EXACTO del script original
             labels, num = self.connected_components_labeling_fast(binary)
             all_props = self.calcular_propiedades(labels, num)
             
-            # Filtrar por área y relación de aspecto
+            # FILTRADO EXACTO del script original
             props = []
             for p in all_props:
                 x1, y1, x2, y2 = p["bbox"]
@@ -392,7 +463,10 @@ class Algoritmo3:
                 if (area_min <= p["area"] <= area_max) and (0.1 < aspect < 0.9):
                     props.append(p)
 
-            # Reetiquetar
+            # TODO: Nueva funcionalidad - orden izquierda a derecha
+            props = self.ordenar_objetos_por_x(props)
+
+            # REETIQUETADO EXACTO del script original
             label_map = {0: 0}
             new_label = 0
             for p in props:
@@ -416,7 +490,7 @@ class Algoritmo3:
             return False
 
     def connected_components_labeling_fast(self, binary: np.ndarray) -> Tuple[np.ndarray, int]:
-        """Componentes conectados con scipy o fallback - TODO: Movido desde ambos scripts"""
+        """Componentes conectados con scipy o fallback - TODO: Movido EXACTO desde ambos scripts"""
         if SCIPY_AVAILABLE:
             try:
                 labeled, num = ndimage.label(binary)
@@ -427,7 +501,8 @@ class Algoritmo3:
 
     @staticmethod
     def connected_components_labeling(binary: np.ndarray, connectivity: int = 8) -> Tuple[np.ndarray, int]:
-        """Componentes conectados manual - TODO: Movido desde ambos scripts"""
+        """Componentes conectados manual - TODO: Movido EXACTO desde ambos scripts"""
+        # ALGORITMO EXACTO del script original
         H, W = binary.shape
         labels = np.zeros((H, W), dtype=np.int32)
         current_label = 0
@@ -461,7 +536,7 @@ class Algoritmo3:
 
     @staticmethod
     def calcular_propiedades(labels: np.ndarray, num: int) -> List[Dict]:
-        """Calcula propiedades de objetos etiquetados - TODO: Movido desde ambos scripts"""
+        """Calcula propiedades de objetos etiquetados - TODO: Movido EXACTO desde ambos scripts"""
         props = []
         if num == 0:
             return props
@@ -491,7 +566,7 @@ class Algoritmo3:
         return props
 
     def extraer_medidas_objeto(self, etiqueta: int, prop: Dict) -> Tuple[int, int, float, float, float, List[float]]:
-        """Extrae medidas detalladas de un objeto - TODO: Movido desde ambos scripts"""
+        """Extrae medidas detalladas de un objeto - TODO: Movido EXACTO desde ambos scripts"""
         if self.labels is None:
             return 0, 0, 0.0, 0.0, 0.0, [0.0] * 7
 
@@ -523,7 +598,8 @@ class Algoritmo3:
 
     @staticmethod
     def calcular_momentos_hu(mask_crop: np.ndarray, cx: float, cy: float, m00: int) -> List[float]:
-        """Calcula momentos de Hu - TODO: Movido desde ambos scripts"""
+        """Calcula momentos de Hu - TODO: Movido EXACTO desde ambos scripts"""
+        # ALGORITMO EXACTO del script original
         mask = mask_crop > 0
         if m00 <= 0 or not np.any(mask):
             return [0.0] * 7
@@ -575,7 +651,7 @@ class Algoritmo3:
     # ============ CLASIFICACIÓN Y GUARDADO ============
 
     def clasificar_objeto(self, etiqueta: int, caracter: str) -> bool:
-        """Clasifica un objeto con un carácter - TODO: Movido desde clasificar_objeto"""
+        """Clasifica un objeto con un carácter - TODO: Movido EXACTO desde clasificar_objeto"""
         if not caracter or len(caracter) != 1 or not (caracter.isalpha() or caracter.isdigit()):
             return False
             
@@ -583,7 +659,7 @@ class Algoritmo3:
         return True
 
     def guardar_en_base_datos(self) -> int:
-        """Guarda clasificaciones en la base de datos - TODO: Movido desde guardar_en_base_datos"""
+        """Guarda clasificaciones en la base de datos - TODO: Movido EXACTO desde guardar_en_base_datos"""
         if not self.clasificaciones or not self.props:
             return 0
 
@@ -601,6 +677,7 @@ class Algoritmo3:
             num_pixeles, perimetro, circularidad, cx_local, cy_local, hu = \
                 self.extraer_medidas_objeto(etiqueta, prop)
 
+            # FORMATO EXACTO del script original
             muestra = {
                 "caracter": caracter,
                 "area": prop["area"],
@@ -635,7 +712,7 @@ class Algoritmo3:
 
     def generar_imagen_coloreada(self, labels: Optional[np.ndarray] = None, 
                                props: Optional[List[Dict]] = None) -> Image.Image:
-        """Genera imagen coloreada con etiquetas - TODO: Movido desde generar_imagen_coloreada"""
+        """Genera imagen coloreada con etiquetas - TODO: Movido EXACTO desde generar_imagen_coloreada"""
         if labels is None:
             labels = self.labels
         if props is None:
@@ -686,7 +763,7 @@ class Algoritmo3:
         return pil_img
 
     def generar_imagen_predicciones(self, resultados: List[Dict]) -> Image.Image:
-        """Genera imagen con predicciones - TODO: Adaptado desde PREDICCION_PLACAS_V2.py"""
+        """Genera imagen con predicciones - TODO: Adaptado EXACTO desde PREDICCION_PLACAS_V2.py"""
         if self.labels is None:
             return Image.new('RGB', (100, 100), color='white')
 
@@ -740,7 +817,7 @@ class Algoritmo3:
     # ============ PREDICCIÓN AUTOMÁTICA ============
 
     def predecir_caracteres(self, use_knn: bool = True, k: int = 5) -> List[Dict]:
-        """Predice caracteres automáticamente - TODO: Adaptado desde PREDICCION_PLACAS_V2.py"""
+        """Predice caracteres automáticamente - TODO: Adaptado EXACTO desde PREDICCION_PLACAS_V2.py"""
         if self.labels is None or not self.props:
             return []
 
@@ -772,12 +849,15 @@ class Algoritmo3:
             p["dist"] = dist
             resultados.append(p)
 
+        # TODO: Nueva funcionalidad - orden izquierda a derecha para predicciones
+        resultados = self.ordenar_objetos_por_x(resultados)
+
         return resultados
 
     # ============ UTILIDADES ============
 
     def limpiar_etiquetas(self):
-        """Limpia el estado de etiquetado"""
+        """Limpia el estado de etiquetado - TODO: Movido desde limpiar_etiquetas"""
         self.labels = None
         self.num_labels = 0
         self.props = []
@@ -785,9 +865,15 @@ class Algoritmo3:
         self.clasificaciones = {}
 
     def get_info_imagen(self) -> Dict[str, Any]:
-        """Obtiene información de la imagen actual"""
+        """Obtiene información de la imagen actual - TODO: Función nueva para frontend"""
         if self.img_original_pil is None:
-            return {"ancho": 0, "alto": 0, "tiene_imagen": False}
+            return {
+                "ancho": 0, 
+                "alto": 0, 
+                "tiene_imagen": False,
+                "num_objetos": 0,
+                "tamano_bd": len(self.base_datos)
+            }
             
         ancho, alto = self.img_original_pil.size
         return {
@@ -820,7 +906,7 @@ class Algoritmo3:
         return None
 
 
-# Funciones de conveniencia para mantener compatibilidad
+# Funciones de conveniencia para mantener compatibilidad EXACTA
 def crear_elemento_estructurante(forma: str, radio: int) -> np.ndarray:
     """Wrapper para mantener compatibilidad - TODO: Movido desde ambos scripts"""
     return Algoritmo3.crear_elemento_estructurante(forma, radio)

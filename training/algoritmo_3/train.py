@@ -1,6 +1,7 @@
 """
 Script de entrenamiento para el Algoritmo 3
 TODO: Adaptado desde la lógica de ENTRENAMIENTO_PLACAS_V3.py
+Mantiene EXACTAMENTE la misma lógica de entrenamiento original
 """
 
 import os
@@ -9,9 +10,10 @@ import argparse
 import json
 from typing import List, Dict, Any
 import numpy as np
+from pathlib import Path
 
 # Agregar ruta para imports
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from backend.algoritmo_3.procesamiento import Algoritmo3
 from backend.algoritmo_3.utils import validar_caracter
@@ -20,15 +22,15 @@ from backend.algoritmo_3.utils import validar_caracter
 def entrenar_desde_directorio(directorio_entrada: str, db_salida: str = None) -> Dict[str, Any]:
     """
     Entrena el modelo procesando imágenes de un directorio
-    TODO: Adaptado desde la lógica de guardar_en_base_datos
+    TODO: Adaptado EXACTO desde la lógica de guardar_en_base_datos
     """
     
     print(f"🔍 Iniciando entrenamiento desde directorio: {directorio_entrada}")
     
-    # Inicializar algoritmo
+    # Inicializar algoritmo - EXACTO al original
     algoritmo = Algoritmo3(db_salida)
     
-    # Buscar archivos de imagen
+    # Buscar archivos de imagen - Misma lógica del original
     extensiones_validas = ('.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff')
     archivos_imagen = []
     
@@ -53,12 +55,12 @@ def entrenar_desde_directorio(directorio_entrada: str, db_salida: str = None) ->
         print(f"🔄 Procesando imagen {i}/{len(archivos_imagen)}: {os.path.basename(ruta_imagen)}")
         
         try:
-            # Cargar imagen
+            # Cargar imagen - Misma lógica del original
             if not algoritmo.cargar_imagen(ruta_imagen):
                 resultados["errores"].append(f"Error cargando {ruta_imagen}")
                 continue
             
-            # Procesamiento automático
+            # Procesamiento automático - Misma secuencia del original
             umbral_otsu = algoritmo.calcular_umbral_otsu(algoritmo.img_gray_np)
             algoritmo.aplicar_umbral(umbral_otsu)
             algoritmo.aplicar_morfologia("Cerramiento", "Disco", 3)
@@ -116,6 +118,9 @@ def exportar_modelo(ruta_db: str, ruta_salida: str) -> bool:
             }
         }
         
+        # Asegurar que el directorio de salida existe
+        Path(ruta_salida).parent.mkdir(parents=True, exist_ok=True)
+        
         with open(ruta_salida, 'w', encoding='utf-8') as f:
             json.dump(modelo, f, indent=2, ensure_ascii=False)
         
@@ -153,7 +158,7 @@ def estadisticas_base_datos(ruta_db: str) -> Dict[str, Any]:
             "promedio": np.mean(areas),
             "desviacion": np.std(areas)
         },
-        "ruta_base_datos": ruta_db
+        "ruta_base_datos": str(ruta_db)
     }
     
     return stats
